@@ -1,0 +1,37 @@
+{
+	"name": "denon_avr_volume_control",
+	"version": "1.0.0",
+	"description": "Control your Denon AVR's volume from Volumio.",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"author": "Dale Rider",
+	"license": "ISC",
+	"repository": "https://github.com/charliesjc/denonavrvolume",
+	"volumio_info": {
+		"prettyName": "Denon AVR Volume Control",
+		"icon": "fa-lightbulb-o",
+		"plugin_type": "audio_interface",
+		"architectures": [
+			"amd64",
+			"armhf",
+			"i386"
+		],
+		"os": [
+			"buster"
+		],
+		"details": "Controls volume on Denon AVR using Heos and TCP connection, all from inside Volumio 3.",
+		"changelog": "First draft"
+	},
+	"engines": {
+		"node": ">=14",
+		"volumio": ">=3"
+	},
+	"dependencies": {
+		"fs-extra": "^0.28.0",
+		"heos-api": "^4.0.0",
+		"kew": "^0.7.0",
+		"v-conf": "^1.4.0"
+	}
+}
