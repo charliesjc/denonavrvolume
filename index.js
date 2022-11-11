@@ -10,8 +10,22 @@ var net = require('net')
 
 var denonDevices = [];
 var singleDevice = [];
+var activeDevice;
 const port = 23;
 var host;
+var volumeSettings = {
+	maxvolume: '98',
+	volumecurve: 'linear',
+	volumesteps: 1,
+	volumeOverride: true
+};
+
+var Volume = {
+	vol: null,
+	mute: null,
+	disableVolumeControl: false
+};
+
 
 module.exports = denonAvrVolumeControl;
 function denonAvrVolumeControl(context) {
@@ -116,11 +130,12 @@ denonAvrVolumeControl.prototype.setConf = function (varName, varValue) {
 denonAvrVolumeControl.prototype.setupHeosAndIdDevices = function () {
 	var self = this;
 	var defer = libQ.defer();
+	if (activeDevice) activeDevice.end();
+	activeDevice = undefined;
+	denonDevices = [];
 
 	if (this.commandRouter.executeOnPlugin('audio_interface', 'alsa_controller', 'getConfigParam', 'mixer_type') == 'None') {
 		//Set everything up and allow the volume to be changed. We only want to be messing with the volume if nothing else is.
-		denonDevices = [];
-		var denonDevice = new net.Socket();
 
 		heos.discoverAndConnect().then(connection => {
 			connection
@@ -134,26 +149,39 @@ denonAvrVolumeControl.prototype.setupHeosAndIdDevices = function () {
 						if (singleDevice) {
 							host = singleDevice[1];
 							// self.logger.info(`Denon AVR Volume Control::Device found: ${singleDevice[0]} with IP address: ${singleDevice[1]}`);
-							denonDevice.connect(port, host, function () {
+							activeDevice = new net.Socket();
+							activeDevice.connect(port, host, function () {
 								self.logger.info(`Denon AVR Volume Control::Connected to ${singleDevice[0]} on ${host}`);
 								// defer.resolve();
 
-								// denonDevice.write('MV?');
+								// activeDevice.write('MV?');
 
 							});
 
-							denonDevice.on('data', function (data) {
+							activeDevice.on('data', function (data) {
 								self.logger.debug(`Denon AVR Volume Control:: ${data}`);
 								if (data.includes('MV') && !data.includes('MVMAX')) {
+									// Process volume from the AVR
+									let vol = parseInt((data.toString().replace('MV', '') == '--') ? 0 : data.toString().replace('MV', ''));
+									vol = (Math.floor(vol % 10) === 5) ? Math.round(vol / 10) : vol;
+									Volume.vol = (vol >= 0 && vol <= 98) ? vol : Volume.vol;
+									self.commandRouter.volumioupdatevolume(Volume);
 									self.logger.info(`Denon AVR Volume Control::Current volume is: ${data.toString().replace('MV', '')}`);
+
+								} else if (data.includes('MVMAX')) {
+									// Process Max volume restriction from the AVR
+									let maxvol = parseInt(data.toString().replace('MVMAX', ''));
+									volumeSettings.maxvolume = (Math.floor(maxvol % 10) === 5) ? Math.round(maxvol / 10) : 98;
+									self.commandRouter.volumioUpdateVolumeSettings(volumeSettings);
+									self.logger.info(`Denon AVR Volume Control::Max volume allowed is: ${volumeSettings.maxvolume}`);
 								}
 							});
 
-							denonDevice.on('close', function () {
+							activeDevice.on('close', function () {
 								self.logger.info('Denon AVR Volume Control::Connection Closed');
 							});
 
-							denonDevice.on('error', function (error) {
+							activeDevice.on('error', function (error) {
 								self.logger.error(`Denon AVR Volume Control::Connection Error ${error}`);
 								defer.reject(error)
 							});
@@ -166,7 +194,16 @@ denonAvrVolumeControl.prototype.setupHeosAndIdDevices = function () {
 				.write('player', 'get_players', {})
 			// .write('system', 'register_for_change_events', { enable: 'on' })
 
-			defer.resolve()
+			// Get output card number
+			let outputdevice = self.commandRouter.executeOnPlugin('audio_interface', 'alsa_controller', 'getConfigParam', 'outputdevice');
+
+			// Override the volume control using the built-in method
+			// self.commandRouter.executeOnPlugin('audio_interface', 'alsa_controller', 'setDeviceVolumeOverride', {
+			// 	card: outputdevice, pluginType: 'audio_interface', pluginName: 'denon_avr_volume_control', overrideAvoidSoftwareMixer: true
+			// });
+
+			defer.resolve();
+
 		})
 			.catch((e) => {
 				self.logger.error(`Denon AVR Volume Control::${e}`);
@@ -179,3 +216,37 @@ denonAvrVolumeControl.prototype.setupHeosAndIdDevices = function () {
 
 }
 
+denonAvrVolumeControl.prototype.updateVolumeSettings = function (data) {
+	var self = this;
+	var defer = libQ.defer();
+
+	// self.logger.error(`AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA: ${JSON.stringify(data, null, ' ')}`);
+
+	defer.resolve(data);
+	return defer.promise;
+}
+
+denonAvrVolumeControl.prototype.retrievevolume = function () {
+	var self = this;
+	var defer = libQ.defer();
+
+	libQ.resolve(Volume)
+		.then(function (Volume) {
+			defer.resolve(Volume);
+			self.commandRouter.volumioupdatevolume(Volume);
+		});
+
+
+	return defer.promise;
+}
+
+denonAvrVolumeControl.prototype.alsavolume = function (VolumeInteger) {
+	var self = this;
+	var defer = libQ.defer();
+	libQ.resolve(Volume)
+		.then(function (Volume) {
+			defer.resolve(Volume);
+			self.commandRouter.volumioupdatevolume(Volume);
+		});
+	return defer.promise;
+}
