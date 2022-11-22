@@ -12,7 +12,7 @@
 	"volumio_info": {
 		"prettyName": "Denon AVR Volume Control",
 		"icon": "fa-lightbulb-o",
-		"plugin_type": "audio_interface",
+		"plugin_type": "system_hardware",
 		"architectures": [
 			"amd64",
 			"armhf",

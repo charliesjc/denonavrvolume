@@ -187,7 +187,7 @@ function denonAvrVolumeControl(context) {
 
 				// Override the volume control using the built-in method
 				self.commandRouter.executeOnPlugin('audio_interface', 'alsa_controller', 'setDeviceVolumeOverride', {
-					card: outputdevice, pluginType: 'audio_interface', pluginName: 'denon_avr_volume_control', overrideAvoidSoftwareMixer: true
+					card: outputdevice, pluginType: 'system_hardware', pluginName: 'denon_avr_volume_control', overrideAvoidSoftwareMixer: true
 				});
 
 				defer.resolve();
