@@ -11,7 +11,7 @@
 	"repository": "https://github.com/charliesjc/denonavrvolume",
 	"volumio_info": {
 		"prettyName": "Denon AVR Volume Control",
-		"icon": "fa-lightbulb-o",
+		"icon": "fas fa-volume-up",
 		"plugin_type": "system_hardware",
 		"architectures": [
 			"amd64",
@@ -21,7 +21,7 @@
 		"os": [
 			"buster"
 		],
-		"details": "Controls volume on Denon AVR using Heos and TCP connection, all from inside Volumio 3.",
+		"details": "Controls volume on Denon AVR using Heos and TCP connection.",
 		"changelog": "First draft"
 	},
 	"engines": {

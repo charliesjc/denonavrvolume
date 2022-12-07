@@ -154,7 +154,9 @@ function denonAvrVolumeControl(context) {
 								activeDevice = new net.Socket();
 								activeDevice.connect(port, host, function () {
 									self.logger.info(`Denon AVR Volume Control::Connected to ${singleDevice[0]} on ${host}`);
-									self.sendCommand('MV?');
+									setTimeout(() => {
+										self.sendCommand('MV?');
+									}, 1001); // Give it some time before we blast off
 
 									// activeDevice.write('MV?');
 
@@ -171,7 +173,6 @@ function denonAvrVolumeControl(context) {
 
 								activeDevice.on('error', function (error) {
 									self.logger.error(`Denon AVR Volume Control::Connection Error ${error}`);
-									defer.reject(error)
 								});
 							}
 						}
@@ -207,16 +208,19 @@ function denonAvrVolumeControl(context) {
 	self.decodeVolume = function (data) {
 		if (data.includes('MV') && !data.includes('MVMAX')) {
 			// Process volume from the AVR
-			let vol = parseInt((data.toString().replace('MV', '') == '--') ? 0 : data.toString().replace('MV', ''));
-			vol = (Math.floor(vol % 10) === 5) ? Math.round(vol / 10) : vol;
+			let vol = (data.toString().replace('MV', '') == '--') ? 0 : data.toString().replace('MV', '');
+			vol = vol.length === 3 ? Number(vol) : Number(vol) / 10; // I don't why it's working like this, it's like it's opposite day
+
+			self.logger.verbose('After mod: ' + vol);
 			Volume.vol = (vol >= 0 && vol <= 98) ? vol : Volume.vol;
 			self.commandRouter.volumioupdatevolume(Volume);
-			self.logger.info(`Denon AVR Volume Control::Current volume is: ${data.toString().replace('MV', '')}`);
+			self.logger.info(`Denon AVR Volume Control::Current volume is: ${Volume.vol}`);
 
 		} else if (data.includes('MVMAX')) {
 			// Process Max volume restriction from the AVR
-			let maxvol = parseInt(data.toString().replace('MVMAX', ''));
-			volumeSettings.maxvolume = (Math.floor(maxvol % 10) === 5) ? Math.round(maxvol / 10) : 98;
+			let maxvol = data.toString().replace('MVMAX', '');
+			maxvol = (maxvol.length === 3) ? (Number(maxvol) / 10) : Number(maxvol);
+			volumeSettings.maxvolume = (maxvol >= 0 && maxvol <= 98) ? maxvol : volumeSettings.maxvolume;
 			// self.commandRouter.volumioUpdateVolumeSettings(volumeSettings);
 			self.logger.info(`Denon AVR Volume Control::Max volume allowed is: ${volumeSettings.maxvolume}`);
 		}
@@ -226,9 +230,11 @@ function denonAvrVolumeControl(context) {
 		var defer = libQ.defer();
 
 		if (activeDevice && cmd) {
-			activeDevice.write(cmd, (err) => {
-				(!err) ? defer.resolve : defer.reject;
-			});
+			setTimeout(() => {
+				activeDevice.write(cmd, (err) => {
+					(!err) ? defer.resolve : defer.reject;
+				})
+			}, 51); // Denon API requires at least 50ms between successive commands.
 		}
 		return defer.promise;
 	}
@@ -272,9 +278,8 @@ function denonAvrVolumeControl(context) {
 	denonAvrVolumeControl.prototype.alsavolume = function (VolumeInteger) {
 		var self = this;
 		var defer = libQ.defer();
-		var self = this;
 
-		self.logger.info('denonAvrVolumeControl::SetAlsaVolume' + VolumeInteger);
+		self.logger.info('denonAvrVolumeControl::SetAlsaVolume ' + VolumeInteger);
 
 		switch (VolumeInteger) {
 			case 'mute':
@@ -349,7 +354,7 @@ function denonAvrVolumeControl(context) {
 				Volume.vol = VolumeInteger;
 				Volume.mute = false;
 				Volume.disableVolumeControl = false;
-				self.sendCommand(`MV${VolumeInteger}`).then(() => {
+				self.sendCommand(`MV${VolumeInteger < 10 ? '0' + VolumeInteger : VolumeInteger}`).then(() => {
 					defer.resolve(Volume);
 				});
 		}
