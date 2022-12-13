@@ -337,9 +337,6 @@ function denonAvrVolumeControl(context) {
 				if (VolumeInteger > 98) {
 					VolumeInteger = 98;
 				}
-				if (VolumeInteger - Volume.vol >= 5) {
-					VolumeInteger = Volume.vol + 5;
-				}
 				if (VolumeInteger > volumeSettings.maxvolume) {
 					VolumeInteger = volumeSettings.maxvolume;
 				}
