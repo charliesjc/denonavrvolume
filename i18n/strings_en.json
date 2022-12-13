@@ -1,4 +1,7 @@
 {
   "PLUGIN_CONFIGURATION": "Denon AVR Volume Control Configuration",
-  "SAVE": "Save"
+  "SAVE": "Save",
+  "DENON_AVR_SECTION": "Denon/Marantz detected Receivers:",
+  "AVR_SELECT_DESCRIPTION": "Select your Denon/Marantz receiver from the list.",
+  "AVR_SELECT_LABEL": "AV Receiver:"
 }

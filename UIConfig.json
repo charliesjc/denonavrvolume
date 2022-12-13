@@ -3,5 +3,30 @@
     "label": "TRANSLATE.PLUGIN_CONFIGURATION"
   },
   "sections": [
+    {
+      "id": "section_denonavrvolume",
+      "element": "section",
+      "label": "TRANSLATE.DENON_AVR_SECTION",
+      "icon": "fa-music",
+      "description": "",
+      "content": [
+        {
+          "id": "avr_name",
+          "element": "select",
+          "description": "TRANSLATE.AVR_SELECT_DESCRIPTION",
+          "label": "TRANSLATE.AVR_SELECT_LABEL",
+          "value": {
+            "value": 0,
+            "label": "Choose your AV Receiver"
+          },
+          "options": [
+            {
+              "value": 0,
+              "label": "Choose your AV Receiver"
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

@@ -101,7 +101,18 @@ function denonAvrVolumeControl(context) {
 			__dirname + '/i18n/strings_en.json',
 			__dirname + '/UIConfig.json')
 			.then(function (uiconf) {
+				if (denonDevices) {
+					denonDevices.forEach(device => {
+						self.configManager.pushUIConfigParam(uiconf, 'sections[0].content[0].options', {
+							value: device.ip,
+							label: `${device.name} - ${device.model}`
+						});
+					});
+				} else {
+					self.configManager.setUIConfigParam(uiconf, 'sections[0].content[0].options', { value: 0, label: 'No receivers detected' });
+					self.configManager.setUIConfigParam(uiconf, 'sections[0].content[0].value', { value: 0, label: 'No receivers detected' });
 
+				}
 
 				defer.resolve(uiconf);
 			})
@@ -146,12 +157,12 @@ function denonAvrVolumeControl(context) {
 					.on({ commandGroup: 'player', command: 'get_players' }, (players) => {
 						if (players.payload) {
 							players.payload.forEach(player => {
-								if (player.model && player.model.toLowerCase().includes('denon avr')) denonDevices.push([player.model, player.ip])
+								if (player.model && player.model.toLowerCase().includes('denon avr')) denonDevices.push(player)
 							});
 							singleDevice = denonDevices ? denonDevices[0] : [];
 
 							if (singleDevice) {
-								host = singleDevice[1];
+								host = singleDevice.ip;
 								// self.logger.info(`Denon AVR Volume Control::Device found: ${singleDevice[0]} with IP address: ${singleDevice[1]}`);
 								activeDevice = new Denon.DenonClient(host);
 
