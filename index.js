@@ -48,7 +48,7 @@ function denonAvrVolumeControl(context) {
 		this.config = new (require('v-conf'))();
 		this.config.loadFile(configFile);
 
-		// Tack onto the saveVolumeOptions method to ensure we can setup/cleanup on a mixer change
+		// Tack onto the outputdevicemixer method to ensure we can setup/cleanup on a mixer change
 		this.commandRouter.sharedVars.registerCallback('alsa.outputdevicemixer', this.setupHeosAndIdDevices.bind(this));
 
 		return libQ.resolve();
@@ -145,9 +145,6 @@ function denonAvrVolumeControl(context) {
 	denonAvrVolumeControl.prototype.setupHeosAndIdDevices = function () {
 		var self = this;
 		var defer = libQ.defer();
-		if (activeDevice) activeDevice.disconnect();
-		activeDevice = undefined;
-		denonDevices = [];
 
 		if (this.commandRouter.executeOnPlugin('audio_interface', 'alsa_controller', 'getConfigParam', 'mixer_type') == 'None') {
 			//Set everything up and allow the volume to be changed. We only want to be messing with the volume if nothing else is.
@@ -156,76 +153,103 @@ function denonAvrVolumeControl(context) {
 				connection
 					.on({ commandGroup: 'player', command: 'get_players' }, (players) => {
 						if (players.payload) {
+
+							denonDevices = [];
+
 							players.payload.forEach(player => {
 								if (player.model && player.model.toLowerCase().includes('denon avr')) denonDevices.push(player)
 							});
 							singleDevice = denonDevices ? denonDevices[0] : [];
 
 							if (singleDevice) {
-								host = singleDevice.ip;
-								// self.logger.info(`Denon AVR Volume Control::Device found: ${singleDevice[0]} with IP address: ${singleDevice[1]}`);
-								activeDevice = new Denon.DenonClient(host);
-
-								// Subscribe to volume changes
-
-								activeDevice.on('masterVolumeChanged', (volume) => {
-									// This event will fire every time when the volume changes.
-									// Including non requested volume changes (Using a remote, using the volume wheel on the device).
-									Volume.vol = (volume >= 0 && volume <= 98) ? volume : Volume.vol;
-									self.commandRouter.volumioupdatevolume(Volume);
-									self.logger.info(`Denon AVR Volume Control::Current volume is: ${Volume.vol}`);
-
-								});
-
-								activeDevice.on('masterVolumeMaxChanged', (maxvolume) => {
-
-									volumeSettings.maxvolume = (maxvolume >= 0 && maxvolume <= 98) ? maxvolume : volumeSettings.maxvolume;
-									self.logger.info(`Denon AVR Volume Control::Maximum volume allowed is: ${volumeSettings.maxvolume}`);
-
-								});
-
-								// Make it happen
-								activeDevice.connect().then(() => {
-									self.logger.info(`Denon AVR Volume Control::Connected to ${singleDevice[0]} on ${host}`);
-
-								}).then(() => {
-									return activeDevice.getVolume(); // Get the initial volume to update the UI.
-								})
-									.catch((error) => {
-										// Oh noez.
-										self.logger.error(`Denon AVR Volume Control::${error}`);
-									});
-
+								self.connectToAvr();
 
 							}
 						}
 
 					})
-					.onAll((message) => self.logger.info(`Denon AVR Volume Control::${JSON.stringify(message, null, ' ')}`)) // Change later to debug message
+					.onAll((message) => self.logger.verbose(`Denon AVR Volume Control::${JSON.stringify(message, null, ' ')}`)) // Change later to debug message
 					.write('system', 'register_for_change_events', { enable: 'off' })
 					.write('player', 'get_players', {})
 				// .write('system', 'register_for_change_events', { enable: 'on' })
 
-				// Get output card number
-				let outputdevice = self.commandRouter.executeOnPlugin('audio_interface', 'alsa_controller', 'getConfigParam', 'outputdevice');
-
-				// Override the volume control using the built-in method
-				self.commandRouter.executeOnPlugin('audio_interface', 'alsa_controller', 'setDeviceVolumeOverride', {
-					card: outputdevice, pluginType: 'system_hardware', pluginName: 'denon_avr_volume_control', overrideAvoidSoftwareMixer: true
-				});
-
-				defer.resolve();
-
 			})
 				.catch((e) => {
 					self.logger.error(`Denon AVR Volume Control::${e}`);
-					defer.reject(`Denon AVR Volume Control::${e}`);
+
 				})
 
 		}
 
-		return defer.promise;
+		return defer.resolve();
 
+	}
+
+	denonAvrVolumeControl.prototype.connectToAvr = function () {
+		var self = this;
+		var defer = libQ.defer();
+
+		if (activeDevice) activeDevice.disconnect();
+		activeDevice = undefined;
+
+		host = singleDevice.ip;
+
+		activeDevice = new Denon.DenonClient(host);
+
+		// Subscribe to volume changes
+		activeDevice.on('masterVolumeChanged', (volume) => {
+			// This event will fire every time when the volume changes.
+			// Including non requested volume changes (Using a remote, using the volume wheel on the device).
+			Volume.vol = (volume >= 0 && volume <= 98) ? volume : Volume.vol;
+			self.commandRouter.volumioupdatevolume(Volume);
+			self.logger.info(`Denon AVR Volume Control::Current volume is: ${Volume.vol}`);
+
+		});
+
+		activeDevice.on('masterVolumeMaxChanged', (maxvolume) => {
+
+			volumeSettings.maxvolume = (maxvolume >= 0 && maxvolume <= 98) ? maxvolume : volumeSettings.maxvolume;
+			self.logger.info(`Denon AVR Volume Control::Maximum volume allowed is: ${volumeSettings.maxvolume}`);
+
+		});
+
+		activeDevice.on('close', () => {
+			// self.setVolumeOverride(false);
+		});
+
+		// Make it happen
+		activeDevice.connect().then(() => {
+			self.logger.info(`Denon AVR Volume Control::Connected to ${singleDevice[0]} on ${host}`);
+
+			// Get output card number
+			let outputdevice = self.commandRouter.executeOnPlugin('audio_interface', 'alsa_controller', 'getConfigParam', 'outputdevice');
+
+			// Override the volume control using the built-in method
+			self.setVolumeOverride({
+				card: outputdevice, pluginType: 'system_hardware', pluginName: 'denon_avr_volume_control', overrideAvoidSoftwareMixer: true
+			});
+
+			defer.resolve();
+
+		}).then(() => {
+			return activeDevice.getVolume(); // Get the initial volume to update the UI.
+		})
+			.catch((error) => {
+				// Oh noez.
+				self.logger.error(`Denon AVR Volume Control::${error}`);
+				defer.reject();
+			});
+
+
+
+		return defer.promise;
+	}
+
+	self.setVolumeOverride = function (data) {
+		var self = this;
+
+		// Override the volume control using the built-in method
+		return self.commandRouter.executeOnPlugin('audio_interface', 'alsa_controller', 'setDeviceVolumeOverride', data);
 	}
 
 	denonAvrVolumeControl.prototype.updateVolumeSettings = function (data) {
