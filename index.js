@@ -59,8 +59,9 @@ function denonAvrVolumeControl(context) {
 		var defer = libQ.defer();
 
 		//Setup the plugin to do its thing
-		self.setupHeosAndIdDevices()
-			.then(() => defer.resolve());
+		self.setupHeosAndIdDevices();
+
+		defer.resolve();
 
 		// Once the Plugin has successfull started resolve the promise
 
@@ -82,8 +83,9 @@ function denonAvrVolumeControl(context) {
 		var self = this;
 		var defer = libQ.defer();
 		//Setup the plugin to do its thing
-		self.setupHeosAndIdDevices()
-			.then(() => defer.resolve());
+		self.setupHeosAndIdDevices();
+
+		defer.resolve();
 
 		return defer.promise;
 	};
